@@ -1,7 +1,3 @@
-/**
- * TIME LOGIC ENGINE 
- * Handles mathematical conversions and formatting
- */
 const TimeLogic = {
     toMin: (t) => {
         if (!t) return 0;
@@ -16,7 +12,7 @@ const TimeLogic = {
     getTimestamp: () => {
         const now = new Date();
         const pad = (n) => n.toString().padStart(2, '0');
-        return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}_${pad(now.getMinutes())}_${pad(now.getSeconds())}`;
     },
     generateCSV: (shift, breaks, grossStr, netStr) => {
         let csv = `Category,In,Out,Duration\n`;
