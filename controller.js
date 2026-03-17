@@ -1,9 +1,5 @@
-/**
- * APP CONTROLLER 
- * Manages DOM interactions, validation, and state
- */
 const App = {
-    key: 'workpulse_pro_session_light',
+    key: 'workpulse_blue_glass_session',
     MAX_BREAKS: 20,
     init() { this.cacheDOM(); this.bindEvents(); this.load(); this.startClock(); },
     cacheDOM() {
@@ -32,13 +28,12 @@ const App = {
         const rowCount = document.querySelectorAll('.break-row').length;
         if (rowCount >= this.MAX_BREAKS) return;
         const row = document.createElement('div');
-        // Grid template: 3 even columns + 1 action column
-        row.className = 'break-row bg-white/70 border border-blue-50 rounded-2xl p-3 grid grid-cols-[1fr_1fr_1fr_40px] items-center gap-4 animate-up';
+        row.className = 'break-row bg-white/50 border border-white/80 rounded-2xl p-3 grid grid-cols-[1fr_1fr_1fr_40px] items-center gap-4 animate-up';
         row.innerHTML = `
             <input type="time" class="b-start bg-transparent font-bold text-sm outline-none text-center" value="${s}">
             <input type="time" class="b-end bg-transparent font-bold text-sm outline-none text-center" value="${e}">
             <span class="b-dur text-center text-[10px] font-black text-[#00A3FF] uppercase tracking-tighter">-</span>
-            <button class="del-btn p-2 text-slate-300 hover:text-red-400 transition-colors justify-self-center">
+            <button class="del-btn p-2 text-slate-400 hover:text-red-500 transition-colors justify-self-center">
                 <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="3"/></svg>
             </button>`;
         row.querySelectorAll('input').forEach(i => i.onchange = () => this.update());
@@ -55,48 +50,39 @@ const App = {
         const gross = eMin - sMin;
         const shiftInverted = (this.dom.in.value && this.dom.out.value && gross <= 0);
 
-        this.dom.gross.classList.toggle('text-red-400', shiftInverted);
-        this.dom.gross.textContent = shiftInverted ? "Invalid" : (gross > 0 ? TimeLogic.fmt(gross) : "0h 0m");
-
+        this.dom.gross.textContent = shiftInverted ? "0h 0m" : (gross > 0 ? TimeLogic.fmt(gross) : "0h 0m");
         rows.forEach(r => r.querySelector('.del-btn').style.visibility = (rows.length === 1) ? 'hidden' : 'visible');
 
-        let totalB = 0, overlap = false, outOfBounds = false, duplicate = false, intervals = [];
+        let totalB = 0, overlap = false, outOfBounds = false, breakErr = false, intervals = [];
         const breakData = rows.map(r => {
             const s = r.querySelector('.b-start').value, e = r.querySelector('.b-end').value;
             const start = TimeLogic.toMin(s), end = TimeLogic.toMin(e);
-            let durStr = '-', rowError = false;
+            let durStr = '-';
             if (start && end) {
                 const dur = end - start;
-                if (dur <= 0) { durStr = "ERR"; rowError = true; }
+                if (dur <= 0) { durStr = "ERR"; breakErr = true; }
                 else {
                     durStr = TimeLogic.fmt(dur);
                     totalB += dur;
-                    if (intervals.some(i => start === i.s && end === i.e)) duplicate = true;
                     if (intervals.some(i => start < i.e && i.s < end)) overlap = true;
                     if (start < sMin || end > eMin) outOfBounds = true;
                     intervals.push({ s: start, e: end });
                 }
             }
-            const durEl = r.querySelector('.b-dur');
-            durEl.textContent = durStr;
-            durEl.classList.toggle('text-red-400', rowError);
-            return { s, e, dur: durStr, err: rowError };
+            r.querySelector('.b-dur').textContent = durStr;
+            return { s, e, dur: durStr };
         });
 
         this.dom.totalB.textContent = TimeLogic.fmt(totalB);
         const hasShift = (this.dom.in.value && this.dom.out.value);
-        const globalErr = shiftInverted || overlap || outOfBounds || duplicate || breakData.some(b => b.err);
 
-        // Precision Error Messages
         if (shiftInverted) this.dom.err.textContent = "Check shift times";
-        else if (breakData.some(b => b.err)) this.dom.err.textContent = "Check break times";
+        else if (breakErr) this.dom.err.textContent = "Check break times";
         else if (outOfBounds) this.dom.err.textContent = "Break outside shift";
         else if (overlap) this.dom.err.textContent = "Overlapping breaks";
-        else if (duplicate) this.dom.err.textContent = "Duplicate breaks";
         else this.dom.err.textContent = "";
 
-        // UI State Logic
-        if (!globalErr && hasShift && gross > 0) {
+        if (!shiftInverted && !breakErr && !outOfBounds && hasShift && gross > 0) {
             this.dom.netCard.classList.remove('opacity-20', 'grayscale');
             this.dom.net.textContent = TimeLogic.fmt(gross - totalB);
         } else {
@@ -104,10 +90,9 @@ const App = {
             this.dom.net.textContent = "--";
         }
 
-        const canExport = !!(hasShift && !globalErr);
+        const canExport = !!(hasShift && !shiftInverted && !breakErr && !outOfBounds);
         this.dom.export.disabled = !canExport;
-        this.dom.export.className = canExport ? "p-2 bg-[#00A3FF] text-white rounded-full shadow-lg transition-all" : "p-2 bg-slate-100 text-slate-300 rounded-full cursor-not-allowed transition-all";
-        
+        this.dom.export.className = canExport ? "p-2 bg-white/80 text-[#00A3FF] rounded-full shadow-lg transition-all" : "p-2 bg-white/20 text-slate-400 rounded-full cursor-not-allowed";
         this.dom.reset.disabled = !(this.dom.in.value || this.dom.out.value || rows.length > 1);
         localStorage.setItem(this.key, JSON.stringify({ in: this.dom.in.value, out: this.dom.out.value, breaks: breakData }));
     },
@@ -116,10 +101,8 @@ const App = {
         const rows = [...document.querySelectorAll('.break-row')];
         const breaks = rows.map(r => ({ s: r.querySelector('.b-start').value, e: r.querySelector('.b-end').value, dur: r.querySelector('.b-dur').textContent })).filter(b => b.s && b.e);
         const csv = TimeLogic.generateCSV({ in: this.dom.in.value, out: this.dom.out.value }, breaks, this.dom.gross.textContent, this.dom.net.textContent);
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-        a.download = `WorkPulse_Export.csv`;
-        a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = `WorkPulse_Export_${TimeLogic.getTimestamp()}.csv`; a.click();
     },
     startClock() {
         setInterval(() => {
@@ -135,6 +118,6 @@ const App = {
             if (data.breaks?.length) data.breaks.forEach(b => this.addRow(b.s, b.e)); else this.addRow();
         } else this.addRow();
     },
-    reset() { if (confirm("Clear data?")) { localStorage.removeItem(this.key); location.reload(); } }
+    reset() { if (confirm("Clear session?")) { localStorage.removeItem(this.key); location.reload(); } }
 };
 document.addEventListener('DOMContentLoaded', () => App.init());
